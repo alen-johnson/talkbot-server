@@ -1,38 +1,41 @@
 from flask import Flask, request, jsonify
-import openai
+from openai import OpenAI
 import os
 from dotenv import load_dotenv
+from flask_cors import CORS
 
-# Load environment variables
+
 load_dotenv()
 
-# Set up OpenAI API key
-openai.api_key = os.getenv("OPENAI_API_KEY")
-
 app = Flask(__name__)
+CORS(app)
+
+client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+
 
 @app.route('/chat', methods=['POST'])
 def chat():
-    data = request.json
-    user_message = data.get("message", "")
-    
-    if not user_message:
-        return jsonify({"error": "Message is required"}), 400
-
     try:
-        # Generate a response from OpenAI
-        response = openai.Completion.create(
-            engine="text-davinci-003",
-            prompt=f"User: {user_message}\nBot:",
-            max_tokens=150,
-            n=1,
-            stop=None,
-            temperature=0.7,
+        data = request.json
+        user_message = data.get("message", "")
+        if not user_message:
+            return jsonify({"error": "Message is required"}), 400
+
+        response = client.chat.completions.create(
+            model="gpt-3.5-turbo",  
+            messages=[
+                {"role": "system", "content": "You are a helpful assistant."},
+                {"role": "user", "content": user_message}
+            ],
+            max_tokens=150
         )
-        bot_message = response["choices"][0]["text"].strip()
+
+        bot_message = response['choices'][0]['message']['content']
         return jsonify({"message": bot_message})
+
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        print(f"Error: {str(e)}")  
+        return jsonify({"error": "Something went wrong. Please try again later."}), 500
 
 if __name__ == '__main__':
     app.run(debug=True)
